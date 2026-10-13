@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blood Donation Management System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style> body { font-family: 'Inter', sans-serif; } </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen" x-data="bloodApp()">
+
+    <!-- Login Modal -->
+    <div x-show="!isLoggedIn" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md">
+        <div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl w-80 shadow-2xl">
+            <h2 class="text-xl font-bold text-rose-500 mb-4 text-center">Admin / Volunteer Login</h2>
+            <form @submit.prevent="login">
+                <div class="mb-3">
+                    <label class="block text-xs text-slate-400 mb-1">Username</label>
+                    <input type="text" x-model="loginData.username" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-500" required>
+                </div>
+                <div class="mb-3">
+                    <label class="block text-xs text-slate-400 mb-1">Password</label>
+                    <input type="password" x-model="loginData.password" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-500" required>
+                </div>
+                <div class="mb-5">
+                    <label class="block text-xs text-slate-400 mb-1">Security PIN</label>
+                    <input type="password" x-model="loginData.pin" maxlength="4" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-500" required>
+                </div>
+                <button type="submit" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-semibold py-2 rounded-lg transition shadow-lg shadow-rose-600/30 text-sm">Login</button>
+            </form>
+            <p class="text-[11px] text-slate-500 text-center mt-3">Master: admin / 12345 / 0000</p>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div x-show="isLoggedIn" class="max-w-6xl mx-auto px-4 py-6">
+        <!-- Compact Header -->
+        <header class="flex flex-col sm:flex-row justify-between items-center mb-6 bg-slate-800/60 border border-slate-700/60 p-4 rounded-xl backdrop-blur-xl gap-3">
+            <div>
+                <h1 class="text-xl font-bold text-rose-500">🩸 Blood Donation Management</h1>
+                <p class="text-xs text-slate-400">Secure Admin & Volunteer Panel</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <button @click="fetchData()" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5">
+                    <span x-text="isLoading ? '⏳ Loading...' : '🔄 Refresh Data'"></span>
+                </button>
+                <button @click="showAdminModal = true" class="bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg text-xs font-medium transition">+ Add User</button>
+                <button @click="logout()" class="bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white px-3 py-1.5 rounded-lg text-xs transition border border-rose-500/30">Logout</button>
+            </div>
+        </header>
+
+        <!-- Compact Stats Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <div class="bg-slate-800/80 border border-slate-700/80 p-4 rounded-xl shadow">
+                <p class="text-xs text-slate-400">Total Donors (Fixed)</p>
+                <h3 class="text-2xl font-bold text-white mt-1" x-text="donors.length">0</h3>
+            </div>
+            <div class="bg-slate-800/80 border border-slate-700/80 p-4 rounded-xl shadow">
+                <p class="text-xs text-slate-400">Live / Ready Donors</p>
+                <h3 class="text-2xl font-bold text-emerald-400 mt-1" x-text="liveDonors.length">0</h3>
+            </div>
+            <div class="bg-slate-800/80 border border-slate-700/80 p-4 rounded-xl shadow">
+                <p class="text-xs text-slate-400">On Bed Rest (Countdown)</p>
+                <h3 class="text-2xl font-bold text-amber-400 mt-1" x-text="bedRestDonors.length">0</h3>
+            </div>
+        </div>
+
+        <!-- Sleek Controls & Filters -->
+        <div class="flex flex-col sm:flex-row justify-between items-center gap-3 mb-5">
+            <div class="flex flex-wrap gap-1.5 w-full sm:w-auto">
+                <button @click="activeTab = 'all'" :class="activeTab === 'all' ? 'bg-rose-600 text-white' : 'bg-slate-800 text-slate-300'" class="px-3.5 py-2 rounded-lg text-xs font-medium transition flex items-center gap-1.5">
+                    <span>All Donors</span>
+                    <span class="bg-slate-700 text-slate-200 px-1.5 py-0.5 rounded-full text-[10px] font-bold" x-text="donors.length"></span>
+                </button>
+                <button @click="activeTab = 'live'" :class="activeTab === 'live' ? 'bg-rose-600 text-white' : 'bg-slate-800 text-slate-300'" class="px-3.5 py-2 rounded-lg text-xs font-medium transition flex items-center gap-1.5">
+                    <span>Live Ready List</span>
+                    <span class="bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded-full text-[10px] font-bold" x-text="liveDonors.length"></span>
+                </button>
+                <button @click="activeTab = 'rest'" :class="activeTab === 'rest' ? 'bg-rose-600 text-white' : 'bg-slate-800 text-slate-300'" class="px-3.5 py-2 rounded-lg text-xs font-medium transition flex items-center gap-1.5">
+                    <span>Bed Rest List</span>
+                    <span class="bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full text-[10px] font-bold" x-text="bedRestDonors.length"></span>
+                </button>
+            </div>
+            <div class="flex gap-2 w-full sm:w-auto">
+                <select x-model="selectedGroup" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none">
+                    <option value="">All Blood Groups</option>
+                    <option value="A+">A+</option><option value="A-">A-</option>
+                    <option value="B+">B+</option><option value="B-">B-</option>
+                    <option value="AB+">AB+</option><option value="AB-">AB-</option>
+                    <option value="O+">O+</option><option value="O-">O-</option>
+                </select>
+                <button @click="showRegisterModal = true" class="bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-lg text-xs font-medium transition shadow-lg shadow-emerald-600/20">+ Add Donor</button>
+            </div>
+        </div>
+
+        <!-- Clean Donor Table -->
+        <div class="bg-slate-800/50 border border-slate-700/80 rounded-xl overflow-hidden backdrop-blur-xl shadow-lg">
+            <table class="w-full text-left border-collapse text-xs sm:text-sm">
+                <thead>
+                    <tr class="border-b border-slate-700 bg-slate-800/80 text-slate-400">
+                        <th class="p-3">Name & Address</th>
+                        <th class="p-3">Parents Name</th>
+                        <th class="p-3">Blood Group</th>
+                        <th class="p-3">Mobile</th>
+                        <th class="p-3" x-show="activeTab === 'rest'">Remaining Days</th>
+                        <th class="p-3">Status / Action</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-700/50">
+                    <template x-for="donor in filteredDonors" :key="donor.ID">
+                        <tr class="hover:bg-slate-700/20 transition">
+                            <td class="p-3">
+                                <div class="font-semibold text-white" x-text="donor.FullName"></div>
+                                <div class="text-[11px] text-slate-400" x-text="donor.Address"></div>
+                            </td>
+                            <td class="p-3 text-slate-300 text-xs">
+                                <div x-text="'F: ' + (donor.FatherName || 'N/A')"></div>
+                                <div x-text="'M: ' + (donor.MotherName || 'N/A')"></div>
+                            </td>
+                            <td class="p-3">
+                                <span class="bg-rose-500/20 text-rose-400 font-bold px-2.5 py-1 rounded-md text-xs border border-rose-500/30" x-text="donor.BloodGroup"></span>
+                            </td>
+                            <td class="p-3 text-xs">
+                                <a :href="'tel:' + donor.Mobile" class="text-emerald-400 font-medium hover:underline" x-text="donor.Mobile"></a>
+                                <div class="text-[10px] text-slate-400" x-text="donor.AltMobile"></div>
+                            </td>
+                            <td class="p-3" x-show="activeTab === 'rest'">
+                                <span class="bg-amber-500/20 text-amber-400 px-2.5 py-1 rounded-md text-xs font-semibold border border-amber-500/30" x-text="donor.RemainingDays + ' Days Left'"></span>
+                            </td>
+                            <td class="p-3 flex items-center gap-2">
+                                <span :class="(donor.AccountStatus || 'Active') === 'Inactive' ? 'bg-red-500/20 text-red-400 border-red-500/30' : (donor.Status === 'Live' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border-amber-500/30')" class="px-2 py-0.5 rounded-md text-[11px] font-semibold border" x-text="(donor.AccountStatus || 'Active') === 'Inactive' ? 'Inactive' : donor.Status"></span>
+                                
+                                <button x-show="donor.Status === 'Live' && (donor.AccountStatus || 'Active') !== 'Inactive'" @click="openDonateModal(donor)" class="bg-rose-600 hover:bg-rose-700 text-[11px] px-2.5 py-1 rounded-md font-medium transition">Donate</button>
+                                
+                                <button @click="toggleStatus(donor)" :class="(donor.AccountStatus || 'Active') === 'Inactive' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-700 hover:bg-slate-600'" class="text-[10px] px-2 py-1 rounded-md text-white transition" x-text="(donor.AccountStatus || 'Active') === 'Inactive' ? 'Activate' : 'Deactivate'"></button>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Register Donor Modal -->
+    <div x-show="showRegisterModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
+        <div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-md shadow-2xl">
+            <h3 class="text-lg font-bold text-emerald-400 mb-3">Register New Donor</h3>
+            <form @submit.prevent="registerDonor">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3 text-xs">
+                    <div>
+                        <label class="block text-[11px] text-slate-400 mb-1">Full Name *</label>
+                        <input type="text" x-model="form.fullName" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500" required>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-slate-400 mb-1">Blood Group *</label>
+                        <select x-model="form.bloodGroup" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500" required>
+                            <option value="">Select Group</option>
+                            <option value="A+">A+</option><option value="A-">A-</option>
+                            <option value="B+">B+</option><option value="B-">B-</option>
+                            <option value="AB+">AB+</option><option value="AB-">AB-</option>
+                            <option value="O+">O+</option><option value="O-">O-</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-slate-400 mb-1">Father's Name</label>
+                        <input type="text" x-model="form.fatherName" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-slate-400 mb-1">Mother's Name</label>
+                        <input type="text" x-model="form.motherName" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-slate-400 mb-1">Mobile (Primary) *</label>
+                        <input type="text" x-model="form.mobile" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500" required>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-slate-400 mb-1">Alternative Mobile</label>
+                        <input type="text" x-model="form.altMobile" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+                    </div>
+                </div>
+                <div class="mb-4 text-xs">
+                    <label class="block text-[11px] text-slate-400 mb-1">Address / Area</label>
+                    <input type="text" x-model="form.address" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+                </div>
+                <div class="flex justify-end gap-2 text-xs">
+                    <button type="button" @click="showRegisterModal = false" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg transition">Cancel</button>
+                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 px-4 py-1.5 rounded-lg font-semibold transition">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Record Donation Modal -->
+    <div x-show="showDonateModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
+        <div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-sm shadow-2xl">
+            <h3 class="text-lg font-bold text-rose-500 mb-3">Record Blood Donation</h3>
+            <p class="text-xs text-slate-300 mb-3">Donor: <span class="font-semibold text-white" x-text="selectedDonor?.FullName"></span></p>
+            <form @submit.prevent="submitDonation">
+                <div class="mb-3 text-xs">
+                    <label class="block text-[11px] text-slate-400 mb-1">Donation Date *</label>
+                    <input type="date" x-model="donateForm.donationDate" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-rose-500" required>
+                </div>
+                <div class="mb-3 text-xs">
+                    <label class="block text-[11px] text-slate-400 mb-1">Patient Name *</label>
+                    <input type="text" x-model="donateForm.patientName" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-rose-500" required>
+                </div>
+                <div class="mb-4 text-xs">
+                    <label class="block text-[11px] text-slate-400 mb-1">Reference / Hospital *</label>
+                    <input type="text" x-model="donateForm.reference" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-rose-500" required>
+                </div>
+                <div class="flex justify-end gap-2 text-xs">
+                    <button type="button" @click="showDonateModal = false" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg transition">Cancel</button>
+                    <button type="submit" class="bg-rose-600 hover:bg-rose-700 px-4 py-1.5 rounded-lg font-semibold transition">Confirm</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Admin / Volunteer Modal -->
+    <div x-show="showAdminModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
+        <div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-sm shadow-2xl">
+            <h3 class="text-lg font-bold text-indigo-400 mb-3">Add Admin / Volunteer</h3>
+            <form @submit.prevent="registerAdmin">
+                <div class="mb-3 text-xs">
+                    <label class="block text-[11px] text-slate-400 mb-1">Username *</label>
+                    <input type="text" x-model="adminForm.username" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500" required>
+                </div>
+                <div class="mb-3 text-xs">
+                    <label class="block text-[11px] text-slate-400 mb-1">Password *</label>
+                    <input type="password" x-model="adminForm.password" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500" required>
+                </div>
+                <div class="mb-3 text-xs">
+                    <label class="block text-[11px] text-slate-400 mb-1">Security PIN (4 digits) *</label>
+                    <input type="password" x-model="adminForm.pin" maxlength="4" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500" required>
+                </div>
+                <div class="mb-4 text-xs">
+                    <label class="block text-[11px] text-slate-400 mb-1">Role *</label>
+                    <select x-model="adminForm.role" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500" required>
+                        <option value="Volunteer">Volunteer</option>
+                        <option value="Admin">Admin</option>
+                    </select>
+                </div>
+                <div class="flex justify-end gap-2 text-xs">
+                    <button type="button" @click="showAdminModal = false" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg transition">Cancel</button>
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 px-4 py-1.5 rounded-lg font-semibold transition">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Script Logic -->
+    <script>
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwx_lPJvNnL0VGYm3Q6JuL7gJaIFg9JMjc7HfDPkc6tJ3mm4NKxxG67HI3GLB9ivnQd/exec";
+
+        function bloodApp() {
+            return {
+                isLoggedIn: localStorage.getItem('blood_admin_logged') === 'true',
+                loginData: { username: '', password: '', pin: '' },
+                activeTab: 'all',
+                selectedGroup: '',
+                donors: [],
+                isLoading: false,
+                showRegisterModal: false,
+                showDonateModal: false,
+                showAdminModal: false,
+                selectedDonor: null,
+
+                form: { fullName: '', bloodGroup: '', fatherName: '', motherName: '', mobile: '', altMobile: '', address: '' },
+                donateForm: { donationDate: '', patientName: '', reference: '' },
+                adminForm: { username: '', password: '', pin: '', role: 'Volunteer' },
+
+                init() {
+                    if (this.isLoggedIn) {
+                        this.fetchData();
+                    }
+                },
+
+                login() {
+                    if(this.loginData.username === 'admin' && this.loginData.password === '12345' && this.loginData.pin === '0000') {
+                        this.isLoggedIn = true;
+                        localStorage.setItem('blood_admin_logged', 'true');
+                        this.fetchData();
+                        return;
+                    }
+                    fetch(WEB_APP_URL + "?action=getAdmins")
+                        .then(res => res.json())
+                        .then(data => {
+                            let found = data.find(a => a.username === this.loginData.username && a.password === this.loginData.password && a.pin === this.loginData.pin);
+                            if(found) {
+                                this.isLoggedIn = true;
+                                localStorage.setItem('blood_admin_logged', 'true');
+                                this.fetchData();
+                            } else {
+                                alert('Invalid Username, Password or PIN!');
+                            }
+                        })
+                        .catch(() => alert('Login verification error!'));
+                },
+
+                logout() {
+                    this.isLoggedIn = false;
+                    localStorage.removeItem('blood_admin_logged');
+                    this.loginData = { username: '', password: '', pin: '' };
+                },
+
+                fetchData() {
+                    this.isLoading = true;
+                    fetch(WEB_APP_URL + "?action=getDonors")
+                        .then(res => res.json())
+                        .then(data => { 
+                            this.donors = data; 
+                            this.isLoading = false;
+                        })
+                        .catch(err => {
+                            console.error("Error fetching data:", err);
+                            this.isLoading = false;
+                        });
+                },
+
+                registerDonor() {
+                    let payload = { action: 'register', ...this.form };
+                    fetch(WEB_APP_URL, { method: 'POST', body: JSON.stringify(payload) })
+                        .then(() => {
+                            alert('Donor Registered Successfully!');
+                            this.showRegisterModal = false;
+                            this.form = { fullName: '', bloodGroup: '', fatherName: '', motherName: '', mobile: '', altMobile: '', address: '' };
+                            this.fetchData();
+                        });
+                },
+
+                openDonateModal(donor) {
+                    this.selectedDonor = donor;
+                    this.donateForm = { donationDate: new Date().toISOString().split('T')[0], patientName: '', reference: '' };
+                    this.showDonateModal = true;
+                },
+
+                submitDonation() {
+                    let payload = { action: 'donate', id: this.selectedDonor.ID, ...this.donateForm };
+                    fetch(WEB_APP_URL, { method: 'POST', body: JSON.stringify(payload) })
+                        .then(() => {
+                            alert('Donation Recorded! Moved to Bed Rest.');
+                            this.showDonateModal = false;
+                            this.fetchData();
+                        });
+                },
+
+                toggleStatus(donor) {
+                    let currentStatus = donor.AccountStatus || 'Active';
+                    let newStatus = currentStatus === 'Inactive' ? 'Active' : 'Inactive';
+                    let payload = { action: 'toggleStatus', id: donor.ID, newStatus: newStatus };
+                    fetch(WEB_APP_URL, { method: 'POST', body: JSON.stringify(payload) })
+                        .then(() => {
+                            donor.AccountStatus = newStatus;
+                        });
+                },
+
+                registerAdmin() {
+                    let payload = { action: 'addAdmin', ...this.adminForm };
+                    fetch(WEB_APP_URL, { method: 'POST', body: JSON.stringify(payload) })
+                        .then(() => {
+                            alert('New Admin/Volunteer Created Successfully!');
+                            this.showAdminModal = false;
+                            this.adminForm = { username: '', password: '', pin: '', role: 'Volunteer' };
+                        });
+                },
+
+                get liveDonors() {
+                    return this.donors.filter(d => d.Status === 'Live' && (d.AccountStatus || 'Active') !== 'Inactive' && (this.selectedGroup === '' || d.BloodGroup === this.selectedGroup));
+                },
+
+                get bedRestDonors() {
+                    let filtered = this.donors.filter(d => d.Status === 'Bed Rest' && (d.AccountStatus || 'Active') !== 'Inactive' && (this.selectedGroup === '' || d.BloodGroup === this.selectedGroup));
+                    return filtered.sort((a, b) => a.RemainingDays - b.RemainingDays);
+                },
+
+                get allDonors() {
+                    return this.donors.filter(d => (this.selectedGroup === '' || d.BloodGroup === this.selectedGroup));
+                },
+
+                get filteredDonors() {
+                    if (this.activeTab === 'live') return this.liveDonors;
+                    if (this.activeTab === 'rest') return this.bedRestDonors;
+                    return this.allDonors;
+                }
+            }
+        }
+    </script>
+</body>
+</html>

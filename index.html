@@ -36,7 +36,6 @@
 
     <!-- Main Dashboard -->
     <div x-show="isLoggedIn" class="max-w-6xl mx-auto px-4 py-6">
-        <!-- Compact Header -->
         <header class="flex flex-col sm:flex-row justify-between items-center mb-6 bg-slate-800/60 border border-slate-700/60 p-4 rounded-xl backdrop-blur-xl gap-3">
             <div>
                 <h1 class="text-xl font-bold text-rose-500">🩸 Blood Donation Management</h1>
@@ -109,7 +108,7 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-700/50">
-                    <template x-for="donor in filteredDonors" :key="donor.ID">
+                    <template x-for="(donor, index) in filteredDonors" :key="donor.ID || index">
                         <tr class="hover:bg-slate-700/20 transition">
                             <td class="p-3">
                                 <div class="font-semibold text-white" x-text="donor.FullName"></div>
@@ -339,20 +338,29 @@
                 submitDonation() {
                     let payload = { action: 'donate', id: this.selectedDonor.ID, ...this.donateForm };
                     fetch(WEB_APP_URL, { method: 'POST', body: JSON.stringify(payload) })
-                        .then(() => {
+                        .then(res => res.json())
+                        .then(response => {
                             alert('Donation Recorded! Moved to Bed Rest.');
                             this.showDonateModal = false;
+                            this.selectedDonor.Status = 'Bed Rest';
+                            this.selectedDonor.RemainingDays = 90;
+                            this.selectedDonor.LastDonationDate = this.donateForm.donationDate;
                             this.fetchData();
+                        })
+                        .catch(err => {
+                            alert('Error recording donation!');
                         });
                 },
 
                 toggleStatus(donor) {
                     let currentStatus = donor.AccountStatus || 'Active';
                     let newStatus = currentStatus === 'Inactive' ? 'Active' : 'Inactive';
+                    donor.AccountStatus = newStatus; // Instant UI update
+                    
                     let payload = { action: 'toggleStatus', id: donor.ID, newStatus: newStatus };
                     fetch(WEB_APP_URL, { method: 'POST', body: JSON.stringify(payload) })
                         .then(() => {
-                            donor.AccountStatus = newStatus;
+                            this.fetchData();
                         });
                 },
 
